@@ -1,6 +1,6 @@
 import pygame
 import urllib.request
-import urllib.parse
+import requests
 import time
 import queue
 from threading import Thread
@@ -9,7 +9,11 @@ from threading import Thread
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 
-inputs = queue.Queue()
+ip = "192.168.0.107"
+cam_port = "8080"
+server_port = "8081"
+
+joy_inputs = queue.Queue()
 
 pygame.init()
 pygame.joystick.init()
@@ -23,12 +27,13 @@ def grabber():
     while(True):
         canOpen = False
         try:
-            urllib.request.urlretrieve("http://192.168.137.4:8080/?action=snapshot", "snapshot.jpg")
+            urllib.request.urlretrieve("http://{0}:{1}/?action=snapshot".format(ip, cam_port), "snapshot.jpg")
             canOpen = True
-        except:
+        except Exception as e:
+            print("Error downloading frame")
             canOpen = False
 
-        time.sleep(0.1)
+        time.sleep(0.05)
 
 
 t = Thread(target=grabber)
@@ -38,21 +43,34 @@ t.start()
 needUpdate = False
 
 
+def sendData(data):
+    try:
+        print("http://{0}:{1}/updateinputs".format(ip, server_port))
+        response = requests.post("http://{0}:{1}/updateinputs".format(ip, server_port), data, timeout=0.5)
+        return response
+    except requests.exceptions.RequestException as e:
+        print(e)
+        print("Communication error")
+        return None
+
+
 def updateGamepad():
     global needUpdate
     while(True):
-        if needUpdate:
-            try:
-                input = inputs.get()
-                if input[0] == "button":
-                    data = urllib.parse.urlencode({'joysticks': {1: True, 2: False}, 'buttons': {1: False, 2: True}}, data)
-                    response = urllib.request.urlopen("http://192.168.137.4:8080/updateinputs")
-                    print(response.read())
-            except:
-                pass
-            needUpdate = False
+        joy_input = joy_inputs.get()
+        if joy_input[0].type == pygame.JOYBUTTONDOWN:
+            response = sendData({'type': joy_input[0].type})
+            print("JoyButtonDown {0}".format(joy_input[0].button))
+        elif joy_input[0].type == pygame.JOYBUTTONUP:
+            response = sendData({'type': joy_input[0].type})
+            print("JoyButtonUp {0}".format(joy_input[0].button))
+        elif joy_input[0].type == pygame.JOYHATMOTION:
+            response = sendData({'type': joy_input[0].type})
+            print("JoyHatMotion {0} {1}".format(joy_input[0].hat, joy_input[0].value))
+        else:
+            print("Discarded input")
 
-        time.sleep(0.3)
+        # time.sleep(0.05)
 
 t2 = Thread(target=updateGamepad)
 t2.daemon = True
@@ -116,15 +134,14 @@ while done == False:
 
         # Possible joystick actions: JOYAXISMOTION JOYBALLMOTION JOYBUTTONDOWN JOYBUTTONUP JOYHATMOTION
 
-        if event.type == pygame.JOYAXISMOTION:
-            needUpdate = True
+        # if event.type == pygame.JOYAXISMOTION:
+        #     joy_inputs.put([event.type])
         if event.type == pygame.JOYBUTTONDOWN:
-            needUpdate = True
+            joy_inputs.put([event])
         if event.type == pygame.JOYBUTTONUP:
-            needUpdate = True
-            input.put(["button"])
+            joy_inputs.put([event])
         if event.type == pygame.JOYHATMOTION:
-            needUpdate = True
+            joy_inputs.put([event])
 
 
 
