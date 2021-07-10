@@ -9,7 +9,7 @@ from threading import Thread
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 
-ip = "192.168.0.107"
+ip = "192.168.1.41"
 cam_port = "8080"
 server_port = "8081"
 

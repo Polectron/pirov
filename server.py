@@ -1,6 +1,6 @@
 from bottle import route, run, request
 import pygame
-import RPi.GPIO as io
+from smbus2 import SMBus
 
 @route('/updateinputs')
 def index():
